@@ -195,7 +195,7 @@ const Videos = () => {
         <h3 className="text-3xl font-bold text-gray-800">Videos</h3>
         <button
           onClick={() => openModal()}
-          className="flex items-center gap-2 bg-red-500 text-white px-5 py-2 rounded-lg hover:bg-red-600 transition-all"
+          className="flex items-center gap-2 bg-[#22b573] text-white px-5 py-2 rounded-lg hover:bg-green-400 transition-all"
         >
           <Plus className="w-5 h-5" /> Upload New Video
         </button>
@@ -370,7 +370,7 @@ const Videos = () => {
                  <label
   htmlFor="file"
   className={`block p-3 text-center rounded-lg cursor-pointer transition 
-    ${formData.file ? "bg-red-500 text-white hover:bg-red-600" : "bg-white text-gray-700 border-2 border-red-300 hover:bg-red-100"}`}
+    ${formData.file ? "bg-[#22b573] text-white hover:bg-green-400" : "bg-white text-black border-2 border-green-300 hover:bg-[#6bc29b]"}`}
 >
   {formData.file ? "Uploaded " : "Choose a file"}
 </label>
@@ -390,7 +390,7 @@ const Videos = () => {
               <button
                 type="submit"
                 disabled={isUploading}
-                className={`w-full flex justify-center items-center gap-2 py-3 mt-4 bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600 transition ${
+                className={`w-full flex justify-center items-center gap-2 py-3 mt-4 bg-[#22b573] text-white font-semibold rounded-lg hover:bg-green-400 transition ${
                   isUploading ? "opacity-60 cursor-wait" : ""
                 }`}
               >

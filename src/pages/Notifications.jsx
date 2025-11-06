@@ -21,6 +21,12 @@ const Notifications = () => {
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [creating, setCreating] = useState(false);
 
+  // ✅ Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalData, setTotalData] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
   const {
     register,
     handleSubmit,
@@ -32,26 +38,36 @@ const Notifications = () => {
   const watchType = watch("type");
   const token = localStorage.getItem("authToken");
 
-  // Fetch notifications on mount
+  // ✅ Fetch notifications with pagination
+  const fetchNotifications = async () => {
+    if (!token || !isAuthenticated) return;
+
+    setLoading(true);
+    try {
+      const response = await axios.get(`${API_CONFIG.baseURL}/notification`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: {
+          page: currentPage,
+          limit: pageSize,
+        },
+      });
+
+      const data = response.data.data;
+      const notificationsList = data.notifications || [];
+
+      setNotifications(notificationsList);
+      setTotalData(data.total || notificationsList.length);
+      setTotalPages(data.totalPages || 1);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchNotifications = async () => {
-      if (!token || !isAuthenticated) return;
-
-      try {
-        const response = await axios.get(`${API_CONFIG.baseURL}/notification`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = response.data.data.notifications;
-        setNotifications(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Error fetching notifications:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchNotifications();
-  }, [isAuthenticated, token]);
+  }, [isAuthenticated, token, currentPage, pageSize]);
 
   // Table columns
   const columns = [
@@ -71,18 +87,14 @@ const Notifications = () => {
       key: "type",
       label: "Type",
       render: (value) => (
-        <div>
-          <p className="font-medium text-gray-900 dark:text-white">{value}</p>
-        </div>
+        <p className="font-medium text-gray-900 dark:text-white">{value}</p>
       ),
     },
     {
       key: "createdAt",
       label: "Created",
       render: (value) => (
-        <div>
-          <p className="text-sm">{new Date(value).toLocaleDateString()}</p>
-        </div>
+        <p className="text-sm">{new Date(value).toLocaleDateString()}</p>
       ),
     },
     {
@@ -125,40 +137,34 @@ const Notifications = () => {
   const handleDelete = async (notification) => {
     if (confirm(`Delete notification "${notification.title}"?`)) {
       try {
-        await axios.delete(`${API_CONFIG.baseURL}/notifications/${notification.id}`, {
+        await axios.delete(`${API_CONFIG.baseURL}/notification/${notification.id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setNotifications(notifications.filter((n) => n.id !== notification.id));
+        fetchNotifications(); // ✅ refetch after deletion
       } catch (error) {
         console.error("Error deleting notification:", error);
       }
     }
   };
 
-  // ✅ Create Notification API integration
+  // ✅ Create Notification API
   const onSubmit = async (data) => {
     setCreating(true);
     try {
       const payload = {
         title: data.title,
         message: data.message,
-        type: data.type || "instant", // fallback to "instant"
+        type: data.type || "instant",
         scheduledAt: data.scheduledAt || new Date().toISOString(),
       };
 
-      const response = await axios.post(
-        `${API_CONFIG.baseURL}/notification`,
-        payload,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      const created = response.data.data?.notification || payload;
-      setNotifications([created, ...notifications]);
+      await axios.post(`${API_CONFIG.baseURL}/notification`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       setShowCreateModal(false);
       reset();
+      fetchNotifications(); // ✅ refetch after creation
     } catch (error) {
       console.error("Error creating notification:", error);
       alert("Failed to create notification. Please try again.");
@@ -177,11 +183,18 @@ const Notifications = () => {
         </Button>
       </div>
 
+      {/* ✅ DataTable with pagination support */}
       <DataTable
-      title="Push Notification"
+        title="Push Notification"
         columns={columns}
         data={notifications}
         loading={loading}
+        totalData={totalData}
+        totalPages={totalPages}
+        currentPage={currentPage}
+        pageSize={pageSize}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={setPageSize}
         noDataMessage="No notifications available"
       />
 
@@ -192,43 +205,33 @@ const Notifications = () => {
         onClose={() => setShowCreateModal(false)}
       >
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div>
-            <Input
-              label="Title"
-              placeholder="Enter notification title"
-              {...register("title", { required: true })}
-              error={errors.title}
-            />
-          </div>
-          <div>
-            <TextArea
-              label="Message"
-              placeholder="Enter message content"
-              {...register("message", { required: true })}
-              error={errors.message}
-            />
-          </div>
-
-          <div>
-            <Select
-              label="Type"
-              {...register("type", { required: true })}
-              options={[
-                { label: "Instant", value: "instant" },
-                { label: "Scheduled", value: "scheduled" },
-              ]}
-            />
-          </div>
-
+          <Input
+            label="Title"
+            placeholder="Enter notification title"
+            {...register("title", { required: "Title is required" })}
+            error={errors.title?.message}
+          />
+          <TextArea
+            label="Message"
+            placeholder="Enter message content"
+            {...register("message", { required: "Message is required" })}
+            error={errors.message?.message}
+          />
+          <Select
+            label="Type"
+            {...register("type", { required: "Type is required" })}
+            options={[
+              { label: "Instant", value: "instant" },
+              { label: "Scheduled", value: "scheduled" },
+            ]}
+          />
           {watchType === "scheduled" && (
-            <div>
-              <Input
-                type="datetime-local"
-                label="Scheduled At"
-                {...register("scheduledAt", { required: true })}
-                error={errors.scheduledAt}
-              />
-            </div>
+            <Input
+              type="datetime-local"
+              label="Scheduled At"
+              {...register("scheduledAt", { required: "Scheduled time required" })}
+              error={errors.scheduledAt?.message}
+            />
           )}
 
           <div className="text-right">

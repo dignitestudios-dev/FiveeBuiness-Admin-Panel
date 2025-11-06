@@ -1,71 +1,98 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { io } from "socket.io-client";
 
 const Chat = () => {
-  const [socket, setSocket] = useState(null);
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState({});
   const [input, setInput] = useState("");
 
-  // ✅ Connect socket
+  const socketRef = useRef(null);
+
+  // ✅ Connect socket once (no dependency on selectedUser)
   useEffect(() => {
-    const s = io("https://api.fiveebusiness.com", {
+    const socket = io("https://api.fiveebusiness.com", {
       auth: {
-        token: localStorage.getItem("authToken"), // must be admin JWT
+        token: localStorage.getItem("authToken"),
       },
     });
 
-    setSocket(s);
+    socketRef.current = socket;
 
-    s.on("connect", () => {
-      console.log("✅ Connected as admin:", s.id);
-      s.emit("get_online_users");
+    socket.on("connect", () => {
+      console.log("✅ Connected as admin:", socket.id);
+      socket.emit("get_online_users");
     });
 
-    s.on("online_users", (users) => {
+    socket.on("online_users", (users) => {
       console.log("👥 Online users:", users);
       setOnlineUsers(users);
     });
 
-    s.on("chat_history", (history) => {
-      setMessages(history);
+    socket.on("chat_history", ({ userId, history }) => {
+      console.log("📜 Chat history for", userId, history);
+      setMessages((prev) => ({
+        ...prev,
+        [userId]: history,
+      }));
     });
 
-    s.on("receive_message", (msg) => {
-      if (
-        msg.senderId === selectedUser ||
-        msg.receiverId === selectedUser
-      ) {
-        setMessages((prev) => [...prev, msg]);
-      }
+    socket.on("receive_message", (msg) => {
+      console.log("💬 New message:", msg);
+      const chatPartner =
+        msg.senderRole === "admin" ? msg.receiverId : msg.senderId;
+
+      setMessages((prev) => ({
+        ...prev,
+        [chatPartner]: [...(prev[chatPartner] || []), msg],
+      }));
     });
 
-    s.on("update_chat_list", () => {
-      s.emit("get_online_users");
+    socket.on("update_chat_list", () => {
+      socket.emit("get_online_users");
     });
 
     return () => {
-      s.disconnect();
+      socket.disconnect();
     };
-  }, [selectedUser]);
+  }, []);
 
-  // ✅ When selecting a user
+  // ✅ When selecting a user, request that user's chat history
   const selectUser = (userId) => {
     setSelectedUser(userId);
-    setMessages([]);
-    socket.emit("get_chat_history", { userId, adminId: "admin" });
+    if (socketRef.current) {
+      socketRef.current.emit("get_chat_history", {
+        userId,
+        adminId: "admin",
+      });
+    }
   };
 
   // ✅ Send message
   const sendMessage = () => {
-    if (!input.trim() || !selectedUser) return;
-    socket.emit("send_message", {
+    if (!input.trim() || !selectedUser || !socketRef.current) return;
+
+    socketRef.current.emit("send_message", {
       receiverId: selectedUser,
       message: input,
     });
+
+    const newMsg = {
+      message: input,
+      senderRole: "admin",
+      receiverId: selectedUser,
+    };
+
+    // Optimistically add message to UI
+    setMessages((prev) => ({
+      ...prev,
+      [selectedUser]: [...(prev[selectedUser] || []), newMsg],
+    }));
+
     setInput("");
   };
+
+  const currentMessages = messages[selectedUser] || [];
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -100,31 +127,35 @@ const Chat = () => {
                 Chat with User #{selectedUser}
               </h2>
               <span className="text-gray-500 text-sm">
-                {messages.length} messages
+                {currentMessages.length} messages
               </span>
             </div>
 
             <div className="flex-1 overflow-y-auto bg-white rounded shadow-sm p-4 mb-4">
-              {messages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`mb-2 flex ${
-                    msg.senderRole === "admin"
-                      ? "justify-end text-right"
-                      : "justify-start text-left"
-                  }`}
-                >
+              {currentMessages.length === 0 ? (
+                <p className="text-gray-500 text-center">No messages yet.</p>
+              ) : (
+                currentMessages.map((msg, i) => (
                   <div
-                    className={`p-2 rounded-lg max-w-[70%] ${
+                    key={i}
+                    className={`mb-2 flex ${
                       msg.senderRole === "admin"
-                        ? "bg-blue-500 text-white"
-                        : "bg-gray-200 text-gray-800"
+                        ? "justify-end text-right"
+                        : "justify-start text-left"
                     }`}
                   >
-                    {msg.message}
+                    <div
+                      className={`p-2 rounded-lg max-w-[70%] ${
+                        msg.senderRole === "admin"
+                          ? "bg-blue-500 text-white"
+                          : "bg-gray-200 text-gray-800"
+                      }`}
+                    >
+                      {msg.message}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
 
             <div className="flex">

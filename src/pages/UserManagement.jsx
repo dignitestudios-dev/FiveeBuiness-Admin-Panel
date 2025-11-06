@@ -37,11 +37,20 @@ const [userToConfirm, setUserToConfirm] = useState(null);
 
   
 
-  const { totalData, totalPages, users, loading, getAllUsers } = useGetAllUsers(apiFilters, currentPage, pageSize);
+const { totalData, totalPages, users, loading, getAllUsers } = 
+  useGetAllUsers(apiFilters, currentPage, pageSize, searchTerm);
   console.log("Users:", users);
 
+   // Ensure pagination is handled by the custom hook
+  const handlePageChange = (page) => {
+    setPagination((prev) => ({ ...prev, page }));
+  };
+
+  const handlePageSizeChange = (size) => {
+    setPagination((prev) => ({ ...prev, page: 1, limit: size }));
+  };
+
   useEffect(() => {
-    setCurrentPage(1);
     setApiFilters(filters);
   }, [filters]);
 
@@ -148,19 +157,19 @@ const [userToConfirm, setUserToConfirm] = useState(null);
   return (
     <div className="space-y-6">
       <DataTable
-        title="User Management"
-        data={users}
-        loading={loading}
-        columns={columns}
-        totalData={totalData}
-        totalPages={totalPages}
-        currentPage={currentPage}
-        pageSize={pageSize}
-        searchTerm={searchTerm}
-        onPageChange={setCurrentPage}
-        onPageSizeChange={setPageSize}
-        onSearch={setSearchTerm}
-      />
+  title="User Management"
+  data={users}
+  loading={loading}
+  columns={columns}
+  totalData={totalData}
+  totalPages={totalPages}
+  currentPage={currentPage}
+  pageSize={pageSize}
+  searchTerm={searchTerm}
+  onPageChange={setCurrentPage}   // updates currentPage state
+  onPageSizeChange={setPageSize}  // updates pageSize state
+  onSearch={setSearchTerm}
+/>
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingUser ? "Edit User" : "Add New User"} size="md">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

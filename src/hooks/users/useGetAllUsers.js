@@ -1536,27 +1536,24 @@
 // export default useGetAllUsers;
 
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 import { handleError } from "../../utils/helpers";
-import { API_CONFIG } from "../../config/constants";  // Adjust the import path accordingly
+import { API_CONFIG } from "../../config/constants";
 
-const useGetAllUsers = (filters, search, limit) => {
+const useGetAllUsers = (filters, page, limit, search) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({
     total: 0,
-    page: 1,
     totalPages: 1,
   });
 
   const getAllUsers = async () => {
     setLoading(true);
     try {
-      // Retrieve token from localStorage
       const token = localStorage.getItem("authToken");
 
-      // Add the token to the headers if it exists
       const headers = {
         ...API_CONFIG.headers,
         Authorization: token ? `Bearer ${token}` : "",
@@ -1564,21 +1561,18 @@ const useGetAllUsers = (filters, search, limit) => {
 
       const response = await axios.get(`${API_CONFIG.baseURL}/user/all`, {
         params: {
-          // ...filters, 
+          // ...filters,
           // search,
-          page: pagination.page, // Pagination page
-          limit, // Pagination limit
+          page,
+          limit,
         },
-        headers,  // Include headers with Authorization
+        headers,
       });
 
       if (response.status === 200 && response.data.status) {
-        setUsers(response.data.data.users);  // Set the users' data
-        setPagination({
-          total: response.data.data.total,
-          page: response.data.data.page,
-          totalPages: response.data.data.totalPages,
-        });
+        const { users, total, totalPages } = response.data.data;
+        setUsers(users);
+        setPagination({ total, totalPages });
       }
     } catch (error) {
       handleError(error);
@@ -1587,22 +1581,22 @@ const useGetAllUsers = (filters, search, limit) => {
     }
   };
 
+  // Refetch whenever page, limit, filters, or search changes
   useEffect(() => {
     getAllUsers();
-  }, [filters, search, limit, pagination.page]);  // Add pagination.page as a dependency
+  }, [filters, search, page, limit]);
 
   return {
-    totalData: pagination.total,
-    totalPages: pagination.totalPages,
     users,
     loading,
+    totalData: pagination.total,
+    totalPages: pagination.totalPages,
     getAllUsers,
-    pagination,
-    setPagination, // Allow external components to modify pagination
   };
 };
 
 export default useGetAllUsers;
+
 
 
 

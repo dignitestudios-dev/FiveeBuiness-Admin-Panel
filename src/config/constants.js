@@ -34,7 +34,7 @@ export const THEME_OPTIONS = {
 };
 
 export const API_CONFIG = {
-  baseURL: import.meta.env.VITE_BASE_URL || "https://api.fiveebusiness.com", // set in .env or hardcore here
+  baseURL: import.meta.env.VITE_BASE_URL || "https://api.fiveebusiness.com",   // http://192.168.100.70:3001  https://api.fiveebusiness.com set in .env or hardcore here
   timeout: 100000, //your custom timeout for the API
   headers: {
     "Content-Type": "application/json",
