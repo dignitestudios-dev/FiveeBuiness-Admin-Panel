@@ -37,7 +37,7 @@ const ChatSupport = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const ADMIN_ID = "68e8ff9582494fc2027a5b62"; // Your admin ID
+  const ADMIN_ID = "693fde09c4cf2aad17d4c5a0"; // Your admin ID
   const USER_ID = "68d139b5c0f05bdb66aa62e8"; // Example user ID (replace with dynamic values)
 
   useEffect(() => {

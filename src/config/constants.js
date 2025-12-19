@@ -227,7 +227,7 @@ export const SECURITY_CONFIG = {
   passwordRequireLowercase: true,
   passwordRequireNumbers: true,
   passwordRequireSpecialChars: true,
-  maxLoginAttempts: 80,
+  maxLoginAttempts: 3,
   lockoutDuration: 2 * 60 * 1000, // 2 minutes
   otpLength: 6,
   otpExpiry: 10 * 60 * 1000, // 10 minutes
