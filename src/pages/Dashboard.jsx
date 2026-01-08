@@ -70,7 +70,7 @@ const Dashboard = () => {
         if (response.data.status) {
           setDashboardData(response.data.data); // Store the data in state
         } else {
-          // navigate("/auth/login");
+          navigate("/auth/login");
           setError("Failed to load data");
         }
       } catch (error) {
