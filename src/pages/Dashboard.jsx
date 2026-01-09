@@ -70,10 +70,16 @@ const Dashboard = () => {
         if (response.data.status) {
           setDashboardData(response.data.data); // Store the data in state
         } else {
-          navigate("/auth/login");
           setError("Failed to load data");
         }
       } catch (error) {
+        if (
+          error?.response?.status === 401 ||
+          error?.response?.status === 403
+        ) {
+          localStorage.removeItem("authToken"); // Remove token if unauthorized
+          window.location.href = "/auth/login"; // Redirect to login page
+        }
         setError("An error occurred while fetching data");
       } finally {
         setLoading(false);
