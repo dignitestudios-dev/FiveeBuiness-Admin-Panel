@@ -152,7 +152,7 @@ export const MENU_ITEMS = [
   // },
   {
     id: "videos",
-    label: "Videos",
+    label: "Tax Information",
     icon: "Clapperboard",
     path: "/videos",
     children: [],

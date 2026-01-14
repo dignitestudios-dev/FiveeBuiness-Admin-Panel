@@ -18,7 +18,6 @@ const Videos = () => {
   const [videoToDelete, setVideoToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -71,7 +70,6 @@ const Videos = () => {
         category: video.category,
         file: null,
       });
-      
     } else {
       // Upload mode
       setIsEditing(false);
@@ -88,64 +86,68 @@ const Videos = () => {
 
   // Upload or update video
   const handleUpload = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (!formData.title || !formData.description || !formData.category) {
-    alert("All fields are required.");
-    return;
-  }
-
-  setIsUploading(true);
-
-  const videoData = new FormData();
-  videoData.append("title", formData.title);
-  videoData.append("description", formData.description);
-  videoData.append("category", formData.category);
-  if (formData.file) videoData.append("file", formData.file);
-
-  try {
-    if (isEditing && selectedVideo) {
-      // ✅ Update existing video with PATCH request
-      const response = await axios.patch(
-        `${API_CONFIG.baseURL}/media/video/${selectedVideo._id}`,
-        videoData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      setVideos((prev) =>
-        prev.map((v) => (v._id === selectedVideo._id ? response.data.data : v))
-      );
-    } else {
-      // ✅ Upload new video (POST request)
-      const response = await axios.post(`${API_CONFIG.baseURL}/media/video`, videoData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      setVideos((prev) => [response.data.data, ...prev]);
+    if (!formData.title || !formData.description || !formData.category) {
+      alert("All fields are required.");
+      return;
     }
 
-    // Close the modal
-    closeModal();
+    setIsUploading(true);
 
-    // Reload the page to get the updated list of videos
-    window.location.reload();
+    const videoData = new FormData();
+    videoData.append("title", formData.title);
+    videoData.append("description", formData.description);
+    videoData.append("category", formData.category);
+    if (formData.file) videoData.append("file", formData.file);
 
-  } catch (error) {
-    console.error("Error uploading/updating video:", error);
-    toast.error("Failed to upload or update video.");
-  } finally {
-    setIsUploading(false);
-  }
-};
+    try {
+      if (isEditing && selectedVideo) {
+        // ✅ Update existing video with PATCH request
+        const response = await axios.patch(
+          `${API_CONFIG.baseURL}/media/video/${selectedVideo._id}`,
+          videoData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        setVideos((prev) =>
+          prev.map((v) =>
+            v._id === selectedVideo._id ? response.data.data : v
+          )
+        );
+      } else {
+        // ✅ Upload new video (POST request)
+        const response = await axios.post(
+          `${API_CONFIG.baseURL}/media/video`,
+          videoData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        setVideos((prev) => [response.data.data, ...prev]);
+      }
 
+      // Close the modal
+      closeModal();
 
-    // 🆕 Open delete modal
+      // Reload the page to get the updated list of videos
+      window.location.reload();
+    } catch (error) {
+      console.error("Error uploading/updating video:", error);
+      toast.error("Failed to upload or update video.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // 🆕 Open delete modal
   const openDeleteModal = (video) => {
     setVideoToDelete(video);
     setIsDeleteModalOpen(true);
@@ -164,9 +166,12 @@ const Videos = () => {
     setIsDeleting(true);
 
     try {
-      await axios.delete(`${API_CONFIG.baseURL}/media/video/${videoToDelete._id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await axios.delete(
+        `${API_CONFIG.baseURL}/media/video/${videoToDelete._id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
       // Remove deleted video from UI
       setVideos((prev) => prev.filter((v) => v._id !== videoToDelete._id));
@@ -178,7 +183,6 @@ const Videos = () => {
       setIsDeleting(false);
     }
   };
-
 
   if (loading) {
     return (
@@ -226,7 +230,7 @@ const Videos = () => {
                 <p className="text-sm text-gray-500 line-clamp-2">
                   {video?.description}
                 </p>
-                 <p className="text-sm text-gray-500 line-clamp-2">
+                <p className="text-sm text-gray-500 line-clamp-2">
                   {video?.category}
                 </p>
 
@@ -240,24 +244,24 @@ const Videos = () => {
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
-  onClick={() => openDeleteModal(video)}  // Open the delete modal when clicked
-  className="p-2 text-black border-2 hover:bg-red-500 hover:text-white rounded-xl transition"
-  title="Delete"
->
-  <Trash2 className="w-4 h-4" />
-</button>
-
+                    onClick={() => openDeleteModal(video)} // Open the delete modal when clicked
+                    className="p-2 text-black border-2 hover:bg-red-500 hover:text-white rounded-xl transition"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <p className="text-gray-600 text-center mt-12">No videos available yet.</p>
+        <p className="text-gray-600 text-center mt-12">
+          No videos available yet.
+        </p>
       )}
 
-
-       {/* 🆕 Delete Confirmation Modal */}
+      {/* 🆕 Delete Confirmation Modal */}
       {isDeleteModalOpen && videoToDelete && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full sm:w-96 p-6 relative">
@@ -274,8 +278,8 @@ const Videos = () => {
                 Delete this video?
               </h4>
               <p className="text-gray-600 mb-5">
-                You are about to permanently delete <b>{videoToDelete.title}</b>.  
-                This action cannot be undone.
+                You are about to permanently delete <b>{videoToDelete.title}</b>
+                . This action cannot be undone.
               </p>
 
               <div className="flex justify-center gap-4 w-full">
@@ -310,7 +314,8 @@ const Videos = () => {
           <div className="bg-white rounded-xl shadow-xl w-full sm:w-96 p-6 relative">
             <button
               onClick={closeModal}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+              disabled={isUploading}
+              className={`absolute top-4 right-4 ${isUploading ? 'text-gray-300 cursor-not-allowed' : 'text-gray-400 hover:text-gray-600'}`}
             >
               <X className="w-5 h-5" />
             </button>
@@ -329,7 +334,8 @@ const Videos = () => {
                   name="title"
                   value={formData.title}
                   onChange={handleInputChange}
-                  className="block w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                  disabled={isUploading}
+                  className="block w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                   required
                 />
               </div>
@@ -342,7 +348,8 @@ const Videos = () => {
                   name="description"
                   value={formData.description}
                   onChange={handleInputChange}
-                  className="block w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                  disabled={isUploading}
+                  className="block w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                   rows="3"
                   required
                 />
@@ -357,7 +364,8 @@ const Videos = () => {
                   name="category"
                   value={formData.category}
                   onChange={handleInputChange}
-                  className="block w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                  disabled={isUploading}
+                  className="block w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                   required
                 />
               </div>
@@ -367,19 +375,30 @@ const Videos = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Choose Video File
                   </label>
-                 <label
-  htmlFor="file"
-  className={`block p-3 text-center rounded-lg cursor-pointer transition 
-    ${formData.file ? "bg-[#22b573] text-white hover:bg-green-400" : "bg-white text-black border-2 border-green-300 hover:bg-[#6bc29b]"}`}
->
-  {formData.file ? "Uploaded " : "Choose a file"}
-</label>
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="file"
+                      className={`block p-3 text-center rounded-lg cursor-pointer transition ${
+        isUploading ? "bg-gray-200 text-gray-400 cursor-not-allowed" : formData.file
+        ? "bg-[#22b573] text-white hover:bg-green-400"
+        : "bg-white text-black border-2 border-green-300 hover:bg-[#6bc29b]"
+      }`}
+                    >
+                      {formData.file ? "Choose different file" : "Choose a file"}
+                    </label>
+                    {formData.file && (
+                      <p className="text-sm text-gray-600 truncate font-medium">
+                        📄 {formData.file.name}
+                      </p>
+                    )}
+                  </div>
 
                   <input
                     type="file"
                     id="file"
                     name="file"
                     onChange={handleFileChange}
+                    disabled={isUploading}
                     className="hidden"
                     accept="video/*"
                     required={!isEditing}
@@ -406,5 +425,3 @@ const Videos = () => {
 };
 
 export default Videos;
-
-
