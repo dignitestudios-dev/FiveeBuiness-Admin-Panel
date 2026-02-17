@@ -34,8 +34,8 @@ export const THEME_OPTIONS = {
 };
 
 export const API_CONFIG = {
-  baseURL: "http://localhost:3001", // http://192.168.100.70:3001  https://api.fiveebusiness.com set in .env or hardcode here
-  // baseURL: "https://api.fiveebusiness.com",
+  // baseURL: "http://localhost:3001", // http://192.168.100.70:3001  https://api.fiveebusiness.com set in .env or hardcode here
+  baseURL: "https://api.fiveebusiness.com",
   timeout: 100000, //your custom timeout for the API
   headers: {
     "Content-Type": "application/json",
