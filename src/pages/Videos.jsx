@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import axios from "axios";
 import { API_CONFIG } from "../config/constants";
-import { Loader, Edit, Trash2, Plus, X, AlertTriangle } from "lucide-react";
+import { Loader, Edit, Trash2, Plus, X, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
 import DataTable from "../components/common/DataTable";
+import { UploadContext } from "../contexts/UploadContext";
 import toast from "react-hot-toast";
 
 const Videos = () => {
@@ -11,7 +12,15 @@ const Videos = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState(null);
-  const [isUploading, setIsUploading] = useState(false);
+
+  // Global upload context
+  const { uploadState, startUpload, updateProgress, completeUpload, cancelUpload, hasUnfinishedUpload, clearUnfinishedFlag } = useContext(UploadContext);
+
+  // Pagination States
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [limit, setLimit] = useState(8);
 
   // 🆕 Delete Modal States
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -27,16 +36,40 @@ const Videos = () => {
 
   const token = localStorage.getItem("authToken");
 
+  // Refetch videos function
+  const refetchVideos = async () => {
+    if (!token) return;
+
+    try {
+      setLoading(true);
+      const response = await axios.get(`${API_CONFIG.baseURL}/media/video?page=1&limit=${limit}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setVideos(response.data.data.video || []);
+      setTotalPages(response.data.data.totalPages || 1);
+      setTotal(response.data.data.total || 0);
+      setCurrentPage(1);
+    } catch (error) {
+      console.error("Error fetching videos:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Fetch videos from API
   useEffect(() => {
     const fetchVideos = async () => {
       if (!token) return;
 
       try {
-        const response = await axios.get(`${API_CONFIG.baseURL}/media/video`, {
+        setLoading(true);
+        const response = await axios.get(`${API_CONFIG.baseURL}/media/video?page=${currentPage}&limit=${limit}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setVideos(response.data.data.video || []);
+        setTotalPages(response.data.data.totalPages || 1);
+        setTotal(response.data.data.total || 0);
+        setLimit(response.data.data.limit || 10);
       } catch (error) {
         console.error("Error fetching videos:", error);
       } finally {
@@ -45,7 +78,26 @@ const Videos = () => {
     };
 
     fetchVideos();
-  }, [token]);
+  }, [token, currentPage, limit]);
+
+  // Skeleton Loader Component
+  const VideoSkeleton = () => (
+    <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 animate-pulse">
+      <div className="relative pt-[56.25%] bg-gray-200" />
+      <div className="p-4 space-y-3">
+        <div className="h-5 bg-gray-200 rounded w-3/4" />
+        <div className="space-y-2">
+          <div className="h-4 bg-gray-200 rounded w-full" />
+          <div className="h-4 bg-gray-200 rounded w-5/6" />
+        </div>
+        <div className="h-4 bg-gray-200 rounded w-1/2" />
+        <div className="flex justify-end gap-3 mt-4">
+          <div className="w-9 h-9 bg-gray-200 rounded-xl" />
+          <div className="w-9 h-9 bg-gray-200 rounded-xl" />
+        </div>
+      </div>
+    </div>
+  );
 
   // Handle input and file changes
   const handleInputChange = (e) => {
@@ -89,61 +141,117 @@ const Videos = () => {
     e.preventDefault();
 
     if (!formData.title || !formData.description || !formData.category) {
-      alert("All fields are required.");
+      toast.error("All fields are required.");
       return;
     }
 
-    setIsUploading(true);
-
-    const videoData = new FormData();
-    videoData.append("title", formData.title);
-    videoData.append("description", formData.description);
-    videoData.append("category", formData.category);
-    if (formData.file) videoData.append("file", formData.file);
+    // If editing, don't require file
+    if (!isEditing && !formData.file) {
+      toast.error("Video file is required.");
+      return;
+    }
 
     try {
       if (isEditing && selectedVideo) {
-        // ✅ Update existing video with PATCH request
+        // ✅ Update existing video metadata only (no progress bar needed)
         const response = await axios.patch(
           `${API_CONFIG.baseURL}/media/video/${selectedVideo._id}`,
-          videoData,
           {
-            headers: {
-              "Content-Type": "multipart/form-data",
-              Authorization: `Bearer ${token}`,
-            },
+            title: formData.title,
+            description: formData.description,
+            category: formData.category,
+          },
+          {
+            headers: { Authorization: `Bearer ${token}` },
           }
         );
+        // Safely pick updated video object from response (handles different API shapes)
+        const updatedFromResponse =
+          response?.data?.data?.video || response?.data?.data || response?.data || {};
+
         setVideos((prev) =>
           prev.map((v) =>
-            v._id === selectedVideo._id ? response.data.data : v
+            v._id === selectedVideo._id ? { ...v, ...updatedFromResponse } : v
           )
         );
+
+        // Also refetch first page to ensure consistent server state
+        try {
+          await refetchVideos();
+        } catch (err) {
+          console.error("Refetch after update failed:", err);
+        }
+
+        toast.success("Video updated successfully!");
+        closeModal();
       } else {
-        // ✅ Upload new video (POST request)
-        const response = await axios.post(
-          `${API_CONFIG.baseURL}/media/video`,
-          videoData,
+        // ✅ Upload new video to S3 with progress
+        // Close modal immediately and show floating progress bar
+        closeModal();
+        startUpload(formData.file.name, formData.file.size);
+
+        // Step 1: Get pre-signed URL from backend
+        updateProgress(5, "preparing");
+        const presignedRes = await axios.get(
+          `${API_CONFIG.baseURL}/media/presigned-url`,
           {
-            headers: {
-              "Content-Type": "multipart/form-data",
-              Authorization: `Bearer ${token}`,
+            params: {
+              fileName: formData.file.name,
+              fileType: formData.file.type,
             },
+            headers: { Authorization: `Bearer ${token}` },
           }
         );
-        setVideos((prev) => [response.data.data, ...prev]);
+
+        const { url, key } = presignedRes.data;
+        updateProgress(10, "uploading");
+
+        // Step 2: Upload video directly to S3
+        await axios.put(url, formData.file, {
+          headers: { "Content-Type": formData.file.type },
+          onUploadProgress: (progressEvent) => {
+            const percent = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            // Map S3 upload progress (0-100) to overall progress (10-85)
+            updateProgress(Math.min(10 + (percent * 0.75), 85), "uploading");
+          },
+        });
+
+        updateProgress(90, "saving");
+        const s3Url = url.split("?")[0]; // Strip query params
+
+        // Step 3: Save metadata to backend
+        const metadataRes = await axios.post(
+          `${API_CONFIG.baseURL}/media/video`,
+          {
+            title: formData.title,
+            description: formData.description,
+            category: formData.category,
+            url: s3Url,
+          },
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        updateProgress(100, "finalizing");
+        
+        // Refetch videos list from API
+        setTimeout(async () => {
+          await refetchVideos();
+          toast.success("Video uploaded successfully!");
+          completeUpload();
+        }, 800);
       }
-
-      // Close the modal
-      closeModal();
-
-      // Reload the page to get the updated list of videos
-      window.location.reload();
     } catch (error) {
       console.error("Error uploading/updating video:", error);
-      toast.error("Failed to upload or update video.");
-    } finally {
-      setIsUploading(false);
+      cancelUpload();
+      if (error.response?.status === 413) {
+        toast.error("File is too large. Maximum size is 500MB.");
+      } else {
+        toast.error("Failed to upload or update video. Please try again.");
+      }
     }
   };
 
@@ -184,13 +292,7 @@ const Videos = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64 text-gray-600">
-        <Loader className="animate-spin w-6 h-6 mr-2" /> Loading videos...
-      </div>
-    );
-  }
+  const skeletonArray = Array.from({ length: 8 });
 
   return (
     <div className="">
@@ -200,13 +302,20 @@ const Videos = () => {
         <button
           onClick={() => openModal()}
           className="flex items-center gap-2 bg-[#22b573] text-white px-5 py-2 rounded-lg hover:bg-green-400 transition-all"
+          disabled={uploadState.isUploading}
         >
           <Plus className="w-5 h-5" /> Upload New Video
         </button>
       </div>
 
-      {/* Video Grid */}
-      {videos.length > 0 ? (
+      {/* Video Grid or Skeleton Loaders */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-6">
+          {skeletonArray.map((_, index) => (
+            <VideoSkeleton key={index} />
+          ))}
+        </div>
+      ) : videos.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-6">
           {videos.map((video) => (
             <div
@@ -261,6 +370,35 @@ const Videos = () => {
         </p>
       )}
 
+      {/* Pagination Controls */}
+      {videos.length > 0 && (
+        <div className="flex justify-between items-center mt-8">
+          <p className="text-sm text-gray-600">
+            Showing page <span className="font-semibold">{currentPage}</span> of{" "}
+            <span className="font-semibold">{totalPages}</span> (Total:{" "}
+            <span className="font-semibold">{total}</span> videos)
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1 || loading}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="w-4 h-4" /> Previous
+            </button>
+            <button
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+              }
+              disabled={currentPage === totalPages || loading}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 🆕 Delete Confirmation Modal */}
       {isDeleteModalOpen && videoToDelete && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
@@ -311,112 +449,231 @@ const Videos = () => {
       {/* Upload / Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full sm:w-96 p-6 relative">
+          <div className="bg-white rounded-xl shadow-xl w-full sm:w-96 p-6 relative overflow-hidden">
+            {/* Close Button */}
             <button
               onClick={closeModal}
-              disabled={isUploading}
-              className={`absolute top-4 right-4 ${isUploading ? 'text-gray-300 cursor-not-allowed' : 'text-gray-400 hover:text-gray-600'}`}
+              disabled={uploadState.isUploading}
+              className={`absolute top-4 right-4 ${uploadState.isUploading ? 'text-gray-300 cursor-not-allowed' : 'text-gray-400 hover:text-gray-600'}`}
             >
               <X className="w-5 h-5" />
             </button>
 
-            <h4 className="text-2xl font-semibold mb-6 text-center text-gray-800">
-              {isEditing ? "Edit Video" : "Upload New Video"}
-            </h4>
-
-            <form onSubmit={handleUpload} className="space-y-5">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Title
-                </label>
-                <input
-                  type="text"
-                  name="title"
-                  value={formData.title}
-                  onChange={handleInputChange}
-                  disabled={isUploading}
-                  className="block w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Description
-                </label>
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  disabled={isUploading}
-                  className="block w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  rows="3"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Category
-                </label>
-                <input
-                  type="text"
-                  name="category"
-                  value={formData.category}
-                  onChange={handleInputChange}
-                  disabled={isUploading}
-                  className="block w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  required
-                />
-              </div>
-
-              {!isEditing && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Choose Video File
-                  </label>
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="file"
-                      className={`block p-3 text-center rounded-lg cursor-pointer transition ${
-        isUploading ? "bg-gray-200 text-gray-400 cursor-not-allowed" : formData.file
-        ? "bg-[#22b573] text-white hover:bg-green-400"
-        : "bg-white text-black border-2 border-green-300 hover:bg-[#6bc29b]"
-      }`}
+            {/* Upload Progress Overlay */}
+            {uploadState.isUploading && (
+              <div className="absolute inset-0 bg-white flex flex-col items-center justify-center rounded-xl">
+                {/* Animated Upload Icon */}
+                <div className="relative mb-6">
+                  <div className="absolute inset-0 rounded-full bg-[#22b573] opacity-20 animate-pulse" />
+                  <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-[#22b573] to-green-400 flex items-center justify-center">
+                    <svg
+                      className="w-10 h-10 text-white animate-bounce"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      {formData.file ? "Choose different file" : "Choose a file"}
-                    </label>
-                    {formData.file && (
-                      <p className="text-sm text-gray-600 truncate font-medium">
-                        📄 {formData.file.name}
-                      </p>
-                    )}
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a2 2 0 00-2-2H8a2 2 0 00-2 2v4m10-4a2 2 0 00-2-2H8a2 2 0 00-2 2m10 0V7a2 2 0 00-2-2H8a2 2 0 00-2 2"
+                      />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Main Message */}
+                <h3 className="text-2xl font-bold text-gray-800 mb-2 text-center">
+                  Video Upload in Progress
+                </h3>
+                <p className="text-gray-500 text-center mb-6 text-sm">
+                  Please do not close this window
+                </p>
+
+                {/* File Information */}
+                {uploadState.fileName && (
+                  <div className="w-full mb-6 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="text-xs text-gray-500 mb-1">File:</p>
+                    <p className="text-sm font-medium text-gray-800 truncate">
+                      {uploadState.fileName}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {(uploadState.fileSize / (1024 * 1024)).toFixed(2)} MB
+                    </p>
+                  </div>
+                )}
+
+                {/* Progress Bar with Percentage */}
+                <div className="w-full space-y-3 mb-6">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <Loader className="w-4 h-4 text-[#22b573] animate-spin" />
+                      <span className="text-sm font-medium text-gray-700">
+                        {uploadState.progress === 100
+                          ? "Finalizing..."
+                          : uploadState.progress > 85
+                          ? "Saving to Database..."
+                          : uploadState.progress > 10
+                          ? "Uploading to Server..."
+                          : "Preparing..."}
+                      </span>
+                    </div>
+                    <span className="text-lg font-bold text-[#22b573]">
+                      {uploadState.progress}%
+                    </span>
                   </div>
 
+                  {/* Progress Bar */}
+                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden shadow-sm">
+                    <div
+                      className="bg-gradient-to-r from-[#22b573] via-green-400 to-emerald-500 h-full rounded-full transition-all duration-300 ease-out shadow-lg"
+                      style={{ width: `${uploadState.progress}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Status Messages */}
+                <div className="w-full space-y-2">
+                  {uploadState.progress >= 5 && (
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#22b573]" />
+                      <span>Getting upload credentials</span>
+                    </div>
+                  )}
+                  {uploadState.progress >= 10 && (
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#22b573]" />
+                      <span>Uploading video file</span>
+                    </div>
+                  )}
+                  {uploadState.progress >= 85 && (
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#22b573]" />
+                      <span>Saving video information</span>
+                    </div>
+                  )}
+                  {uploadState.progress >= 95 && (
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#22b573]" />
+                      <span>Completing upload</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Original Form (Hidden During Upload) */}
+            <div className={uploadState.isUploading ? "opacity-0 pointer-events-none" : ""}>
+              <h4 className="text-2xl font-semibold mb-6 text-center text-gray-800">
+                {isEditing ? "Edit Video" : "Upload New Video"}
+              </h4>
+
+              <form onSubmit={handleUpload} className="space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Title
+                  </label>
                   <input
-                    type="file"
-                    id="file"
-                    name="file"
-                    onChange={handleFileChange}
-                    disabled={isUploading}
-                    className="hidden"
-                    accept="video/*"
-                    required={!isEditing}
+                    type="text"
+                    name="title"
+                    value={formData.title}
+                    onChange={handleInputChange}
+                    disabled={uploadState.isUploading}
+                    className="block w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    required
                   />
                 </div>
-              )}
 
-              <button
-                type="submit"
-                disabled={isUploading}
-                className={`w-full flex justify-center items-center gap-2 py-3 mt-4 bg-[#22b573] text-white font-semibold rounded-lg hover:bg-green-400 transition ${
-                  isUploading ? "opacity-60 cursor-wait" : ""
-                }`}
-              >
-                {isUploading && <Loader className="animate-spin w-4 h-4" />}
-                {isEditing ? "Save Changes" : "Upload Video"}
-              </button>
-            </form>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Description
+                  </label>
+                  <textarea
+                    name="description"
+                    value={formData.description}
+                    onChange={handleInputChange}
+                    disabled={uploadState.isUploading}
+                    className="block w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    rows="3"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Category
+                  </label>
+                  <input
+                    type="text"
+                    name="category"
+                    value={formData.category}
+                    onChange={handleInputChange}
+                    disabled={uploadState.isUploading}
+                    className="block w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    required
+                  />
+                </div>
+
+                {!isEditing && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Choose Video File
+                    </label>
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="file"
+                        className={`block p-3 text-center rounded-lg cursor-pointer transition ${
+          uploadState.isUploading ? "bg-gray-200 text-gray-400 cursor-not-allowed" : formData.file
+          ? "bg-[#22b573] text-white hover:bg-green-400"
+          : "bg-white text-black border-2 border-green-300 hover:bg-[#6bc29b]"
+        }`}
+                      >
+                        {formData.file ? "Choose different file" : "Choose a file"}
+                      </label>
+                      {formData.file && (
+                        <p className="text-sm text-gray-600 truncate font-medium">
+                          📄 {formData.file.name}
+                        </p>
+                      )}
+                    </div>
+
+                    <input
+                      type="file"
+                      id="file"
+                      name="file"
+                      onChange={handleFileChange}
+                      disabled={uploadState.isUploading}
+                      className="hidden"
+                      accept="video/*"
+                      required={!isEditing}
+                    />
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={uploadState.isUploading}
+                  className={`w-full flex justify-center items-center gap-2 py-3 mt-4 bg-[#22b573] text-white font-semibold rounded-lg hover:bg-green-400 transition ${
+                    uploadState.isUploading ? "opacity-60 cursor-wait" : ""
+                  }`}
+                >
+                  {uploadState.isUploading ? (
+                    <>
+                      <Loader className="animate-spin w-4 h-4" />
+                      <span>
+                        {uploadState.progress === 100
+                          ? "Finalizing..."
+                          : uploadState.progress > 85
+                          ? "Saving..."
+                          : "Uploading..."}
+                      </span>
+                    </>
+                  ) : (
+                    `${isEditing ? "Save Changes" : "Upload Video"}`
+                  )}
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}

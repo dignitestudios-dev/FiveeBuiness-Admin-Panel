@@ -2,8 +2,10 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { AppProvider } from "./contexts/AppContext";
 import { AuthProvider } from "./contexts/AuthContext";
+import { UploadProvider } from "./contexts/UploadContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import Layout from "./components/layout/Layout";
+import FloatingUploadProgress from "./components/ui/FloatingUploadProgress";
 
 // Auth pages
 import Login from "./pages/auth/Login";
@@ -38,9 +40,10 @@ function App() {
     <>
       <ThemeProvider>
         <AppProvider>
-          <Router>
-            <AuthProvider>
-              <Routes>
+          <UploadProvider>
+            <Router>
+              <AuthProvider>
+                <Routes>
                 {/* Auth Routes */}
                 <Route path="/auth/login" element={<Login />} />
                 <Route
@@ -161,7 +164,9 @@ function App() {
                 />
               </Routes>
             </AuthProvider>
-          </Router>
+            </Router>
+            <FloatingUploadProgress />
+          </UploadProvider>
         </AppProvider>
       </ThemeProvider>
 
