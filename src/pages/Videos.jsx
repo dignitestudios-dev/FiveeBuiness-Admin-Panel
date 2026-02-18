@@ -1,7 +1,16 @@
 import { useState, useEffect, useContext } from "react";
 import axios from "axios";
 import { API_CONFIG } from "../config/constants";
-import { Loader, Edit, Trash2, Plus, X, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Loader,
+  Edit,
+  Trash2,
+  Plus,
+  X,
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import DataTable from "../components/common/DataTable";
 import { UploadContext } from "../contexts/UploadContext";
 import toast from "react-hot-toast";
@@ -14,7 +23,15 @@ const Videos = () => {
   const [selectedVideo, setSelectedVideo] = useState(null);
 
   // Global upload context
-  const { uploadState, startUpload, updateProgress, completeUpload, cancelUpload, hasUnfinishedUpload, clearUnfinishedFlag } = useContext(UploadContext);
+  const {
+    uploadState,
+    startUpload,
+    updateProgress,
+    completeUpload,
+    cancelUpload,
+    hasUnfinishedUpload,
+    clearUnfinishedFlag,
+  } = useContext(UploadContext);
 
   // Pagination States
   const [currentPage, setCurrentPage] = useState(1);
@@ -34,6 +51,20 @@ const Videos = () => {
     file: null,
   });
 
+  // Validate allowed video formats
+  const isValidVideoFile = (file) => {
+    if (!file) return false;
+    const allowedMime = ["video/mp4", "video/quicktime", "video/mpeg"];
+    const allowedExt = [".mp4", ".mov", ".mpeg"];
+
+    const name = file.name || "";
+    const lower = name.toLowerCase();
+    const hasValidExt = allowedExt.some((ext) => lower.endsWith(ext));
+    const hasValidMime = allowedMime.includes(file.type);
+
+    return hasValidExt || hasValidMime;
+  };
+
   const token = localStorage.getItem("authToken");
 
   // Refetch videos function
@@ -42,9 +73,12 @@ const Videos = () => {
 
     try {
       setLoading(true);
-      const response = await axios.get(`${API_CONFIG.baseURL}/media/video?page=1&limit=${limit}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await axios.get(
+        `${API_CONFIG.baseURL}/media/video?page=1&limit=${limit}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       setVideos(response.data.data.video || []);
       setTotalPages(response.data.data.totalPages || 1);
       setTotal(response.data.data.total || 0);
@@ -63,9 +97,12 @@ const Videos = () => {
 
       try {
         setLoading(true);
-        const response = await axios.get(`${API_CONFIG.baseURL}/media/video?page=${currentPage}&limit=${limit}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const response = await axios.get(
+          `${API_CONFIG.baseURL}/media/video?page=${currentPage}&limit=${limit}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
         setVideos(response.data.data.video || []);
         setTotalPages(response.data.data.totalPages || 1);
         setTotal(response.data.data.total || 0);
@@ -107,6 +144,19 @@ const Videos = () => {
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
+    if (!file) {
+      setFormData((prev) => ({ ...prev, file: null }));
+      return;
+    }
+
+    if (!isValidVideoFile(file)) {
+      toast.error("Only .mp4, .mov, .mpeg video formats are allowed.");
+      setFormData((prev) => ({ ...prev, file: null }));
+      // clear the input value so user can re-select
+      e.target.value = "";
+      return;
+    }
+
     setFormData((prev) => ({ ...prev, file }));
   };
 
@@ -151,6 +201,12 @@ const Videos = () => {
       return;
     }
 
+    // Defensive: ensure selected file is allowed before trying to upload
+    if (formData.file && !isValidVideoFile(formData.file)) {
+      toast.error("Only .mp4, .mov, .mpeg video formats are allowed.");
+      return;
+    }
+
     try {
       if (isEditing && selectedVideo) {
         // ✅ Update existing video metadata only (no progress bar needed)
@@ -163,16 +219,19 @@ const Videos = () => {
           },
           {
             headers: { Authorization: `Bearer ${token}` },
-          }
+          },
         );
         // Safely pick updated video object from response (handles different API shapes)
         const updatedFromResponse =
-          response?.data?.data?.video || response?.data?.data || response?.data || {};
+          response?.data?.data?.video ||
+          response?.data?.data ||
+          response?.data ||
+          {};
 
         setVideos((prev) =>
           prev.map((v) =>
-            v._id === selectedVideo._id ? { ...v, ...updatedFromResponse } : v
-          )
+            v._id === selectedVideo._id ? { ...v, ...updatedFromResponse } : v,
+          ),
         );
 
         // Also refetch first page to ensure consistent server state
@@ -200,7 +259,7 @@ const Videos = () => {
               fileType: formData.file.type,
             },
             headers: { Authorization: `Bearer ${token}` },
-          }
+          },
         );
 
         const { url, key } = presignedRes.data;
@@ -211,16 +270,16 @@ const Videos = () => {
           headers: { "Content-Type": formData.file.type },
           onUploadProgress: (progressEvent) => {
             const percent = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
+              (progressEvent.loaded * 100) / progressEvent.total,
             );
             // Map S3 upload progress (0-100) to overall progress (10-85)
-            updateProgress(Math.min(10 + (percent * 0.75), 85), "uploading");
+            updateProgress(Math.min(10 + percent * 0.75, 85), "uploading");
           },
         });
 
         updateProgress(90, "saving");
         const s3Url = url.split("?")[0]; // Strip query params
-
+        // .mp4, .mov, .mpeg
         // Step 3: Save metadata to backend
         const metadataRes = await axios.post(
           `${API_CONFIG.baseURL}/media/video`,
@@ -232,11 +291,11 @@ const Videos = () => {
           },
           {
             headers: { Authorization: `Bearer ${token}` },
-          }
+          },
         );
 
         updateProgress(100, "finalizing");
-        
+
         // Refetch videos list from API
         setTimeout(async () => {
           await refetchVideos();
@@ -278,7 +337,7 @@ const Videos = () => {
         `${API_CONFIG.baseURL}/media/video/${videoToDelete._id}`,
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
 
       // Remove deleted video from UI
@@ -454,7 +513,7 @@ const Videos = () => {
             <button
               onClick={closeModal}
               disabled={uploadState.isUploading}
-              className={`absolute top-4 right-4 ${uploadState.isUploading ? 'text-gray-300 cursor-not-allowed' : 'text-gray-400 hover:text-gray-600'}`}
+              className={`absolute top-4 right-4 ${uploadState.isUploading ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-gray-600"}`}
             >
               <X className="w-5 h-5" />
             </button>
@@ -512,10 +571,10 @@ const Videos = () => {
                         {uploadState.progress === 100
                           ? "Finalizing..."
                           : uploadState.progress > 85
-                          ? "Saving to Database..."
-                          : uploadState.progress > 10
-                          ? "Uploading to Server..."
-                          : "Preparing..."}
+                            ? "Saving to Database..."
+                            : uploadState.progress > 10
+                              ? "Uploading to Server..."
+                              : "Preparing..."}
                       </span>
                     </div>
                     <span className="text-lg font-bold text-[#22b573]">
@@ -563,7 +622,11 @@ const Videos = () => {
             )}
 
             {/* Original Form (Hidden During Upload) */}
-            <div className={uploadState.isUploading ? "opacity-0 pointer-events-none" : ""}>
+            <div
+              className={
+                uploadState.isUploading ? "opacity-0 pointer-events-none" : ""
+              }
+            >
               <h4 className="text-2xl font-semibold mb-6 text-center text-gray-800">
                 {isEditing ? "Edit Video" : "Upload New Video"}
               </h4>
@@ -623,12 +686,16 @@ const Videos = () => {
                       <label
                         htmlFor="file"
                         className={`block p-3 text-center rounded-lg cursor-pointer transition ${
-          uploadState.isUploading ? "bg-gray-200 text-gray-400 cursor-not-allowed" : formData.file
-          ? "bg-[#22b573] text-white hover:bg-green-400"
-          : "bg-white text-black border-2 border-green-300 hover:bg-[#6bc29b]"
-        }`}
+                          uploadState.isUploading
+                            ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            : formData.file
+                              ? "bg-[#22b573] text-white hover:bg-green-400"
+                              : "bg-white text-black border-2 border-green-300 hover:bg-[#6bc29b]"
+                        }`}
                       >
-                        {formData.file ? "Choose different file" : "Choose a file"}
+                        {formData.file
+                          ? "Choose different file"
+                          : "Choose a file"}
                       </label>
                       {formData.file && (
                         <p className="text-sm text-gray-600 truncate font-medium">
@@ -644,7 +711,7 @@ const Videos = () => {
                       onChange={handleFileChange}
                       disabled={uploadState.isUploading}
                       className="hidden"
-                      accept="video/*"
+                      accept=".mp4,.mov,.mpeg,video/mp4,video/quicktime,video/mpeg"
                       required={!isEditing}
                     />
                   </div>
@@ -664,8 +731,8 @@ const Videos = () => {
                         {uploadState.progress === 100
                           ? "Finalizing..."
                           : uploadState.progress > 85
-                          ? "Saving..."
-                          : "Uploading..."}
+                            ? "Saving..."
+                            : "Uploading..."}
                       </span>
                     </>
                   ) : (
