@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { SECURITY_CONFIG } from "../config/constants";
+import { AUTH_ROUTES, SECURITY_CONFIG } from "../config/constants";
 import { handleError, handleSuccess } from "../utils/helpers";
 import { api } from "../lib/services";
 
@@ -165,15 +165,39 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Forgot password function
-  const forgotPassword = async (payload) => {
+  // Forgot password - emails a reset link pointing back at this panel
+  const forgotPassword = async (email) => {
     setLoadingAuthActions(true);
     try {
-      const response = await api.forgotPassword(payload);
-      return response.success;
+      const response = await api.forgotPassword({
+        email,
+        // Point the emailed link back at whichever origin the request came
+        // from, so localhost/staging/production each resolve to themselves
+        link: `${window.location.origin}${AUTH_ROUTES.RESET_PASSWORD}`,
+      });
+      handleSuccess(response.message, "Reset link sent to your email");
+      return { success: true };
     } catch (error) {
       handleError(error);
-      return false;
+      return { success: false, error: error.message };
+    } finally {
+      setLoadingAuthActions(false);
+    }
+  };
+
+  // Reset password using the token from the emailed link
+  const resetPassword = async (token, newPassword) => {
+    setLoadingAuthActions(true);
+    try {
+      const response = await api.resetPassword({ token, newPassword });
+      handleSuccess(response.message, "Password reset successfully");
+      return { success: true };
+    } catch (error) {
+      handleError(error);
+      return {
+        success: false,
+        error: error.message || "Failed to reset password.",
+      };
     } finally {
       setLoadingAuthActions(false);
     }
@@ -325,6 +349,7 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     forgotPassword,
+    resetPassword,
     verifyOTP,
     updatePassword,
     updatePasswordAuth,

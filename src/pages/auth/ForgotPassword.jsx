@@ -19,12 +19,8 @@ const ForgotPassword = () => {
   } = useForm();
 
   const onSubmit = async (data) => {
-    const payload = {
-      email: data?.email,
-      role: "admin",
-    };
-    const success = await forgotPassword(payload);
-    if (success) {
+    const response = await forgotPassword(data?.email);
+    if (response.success) {
       setIsEmailSent(true);
     }
   };
@@ -42,25 +38,17 @@ const ForgotPassword = () => {
                 Check your email
               </h2>
               <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                We've sent an OTP to{" "}
+                We've sent a password reset link to{" "}
                 <span className="font-medium text-primary-600">
                   {getValues("email")}
                 </span>
               </p>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                Open the link in that email to choose a new password.
+              </p>
             </div>
 
             <div className="mt-8 space-y-4">
-              {/* Verify Button */}
-              <div className="text-center">
-                <Link
-                  to="/auth/verify-otp"
-                  state={{ email: getValues("email") }}
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200"
-                >
-                  Verify OTP
-                </Link>
-              </div>
-
               <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
                 Didn't receive the email? Check your spam folder or{" "}
                 <button
@@ -95,7 +83,8 @@ const ForgotPassword = () => {
             Forgot your password?
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-            Enter your email address and we'll send you an to verify you.
+            Enter your email address and we'll send you a link to reset your
+            password.
           </p>
         </div>
 
@@ -120,7 +109,7 @@ const ForgotPassword = () => {
               loading={loadingAuthActions}
               disabled={loadingAuthActions}
             >
-              {loadingAuthActions ? "Sending..." : "Verify Email"}
+              {loadingAuthActions ? "Sending..." : "Send reset link"}
             </Button>
 
             <div className="text-center">

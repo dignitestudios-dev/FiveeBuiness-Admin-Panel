@@ -160,12 +160,12 @@ const Login = () => {
 
           <div className="flex items-center justify-end">
             <div className="text-sm">
-              {/* <Link
+              <Link
                 to={AUTH_ROUTES.FORGOT_PASSWORD}
                 className="font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300"
               >
                 Forgot your password?
-              </Link> */}
+              </Link>
             </div>
           </div>
 

@@ -17,7 +17,6 @@ import ForgotPassword from "./pages/auth/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
 import Users from "./pages/Users";
 import Analytics from "./pages/Analytics";
-import ChangePassword from "./pages/ChangePassword";
 import Documentation from "./pages/Documentation";
 import Notifications from "./pages/Notifications";
 import Orders from "./pages/Orders";
@@ -139,10 +138,6 @@ function App() {
                                   </h1>
                                 </div>
                               }
-                            />
-                            <Route
-                              path="change-password"
-                              element={<ChangePassword />}
                             />
                             <Route
                               path="general"

@@ -84,8 +84,13 @@ const login = (credentials) =>
     })
   );
 
+// Sends a reset link (containing a token) to the user's email
 const forgotPassword = (payload) =>
-  apiHandler(() => API.post("/auth/forgot", payload));
+  apiHandler(() => API.post("/user/forgot-password", payload));
+
+// Consumes the token from the emailed link: { token, newPassword }
+const resetPassword = (payload) =>
+  apiHandler(() => API.post("/user/reset-password", payload));
 
 const verifyOTP = (payload) =>
   apiHandler(() =>
@@ -190,6 +195,7 @@ const updateOrder = (id, orderData) =>
 export const api = {
   login,
   forgotPassword,
+  resetPassword,
   verifyOTP,
   updatePassword,
   updatePasswordAuth,

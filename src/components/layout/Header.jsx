@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Settings, LogOut, Moon, Sun, Menu, X, Shield } from "lucide-react";
+import { Settings, LogOut, Moon, Sun, Menu, X } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useApp } from "../../contexts/AppContext";
-import { Link } from "react-router-dom";
 
 const Header = () => {
   const { user, logout } = useAuth();
@@ -105,14 +104,6 @@ const Header = () => {
                   </p>
                 </div>
                 <div className="py-2">
-                  <Link
-                    to="/settings/change-password"
-                    onClick={() => setShowUserMenu(false)}
-                    className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
-                  >
-                    <Shield className="w-4 h-4 mr-3" />
-                    Change Password
-                  </Link>
                   <button
                     onClick={handleLogout}
                     className="flex items-center w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"

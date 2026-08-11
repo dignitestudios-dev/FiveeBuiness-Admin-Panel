@@ -1,6 +1,13 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, Eye, EyeOff, Lock, CheckCircle } from "lucide-react";
+import { useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  Eye,
+  EyeOff,
+  Lock,
+  CheckCircle,
+  AlertTriangle,
+} from "lucide-react";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
 import Card from "../../components/ui/Card";
@@ -9,28 +16,22 @@ import { SECURITY_CONFIG } from "../../config/constants";
 import { useAuth } from "../../contexts/AuthContext";
 
 const ResetPassword = () => {
-  const { loadingAuthActions, updatePasswordAuth } = useAuth();
+  const { loadingAuthActions, resetPassword } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
-  let email;
+  const [searchParams] = useSearchParams();
 
-  useEffect(() => {
-    email = location.state?.email;
-    const verified = location.state?.verified;
-
-    if (!email || !verified) {
-      navigate("/auth/login");
-    }
-  }, [location]);
+  // Token comes from the reset link emailed to the user
+  const token = searchParams.get("token");
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     watch,
+    reset,
   } = useForm();
   const watchPassword = watch("password");
 
@@ -66,25 +67,56 @@ const ResetPassword = () => {
   };
 
   const onSubmit = async (data) => {
-    const payload = {
-      password: data.password,
-    };
-
-    const response = await updatePasswordAuth(payload);
+    const response = await resetPassword(token, data.password);
 
     if (response.success) {
-      setIsSuccess(true);
       reset();
-
-      // Hide success message after 5 seconds
-      setTimeout(() => {
-        setIsSuccess(false);
-      }, 5000);
-    } else {
-      handleError(response.error || "Error changing password");
-      console.error("Error changing password:", response.error);
+      setIsSuccess(true);
     }
   };
+
+  // Link opened without a token (or a malformed one)
+  if (!token) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          <Card className="p-8">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900">
+                <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
+              </div>
+              <h2 className="mt-6 text-3xl font-extrabold text-gray-900 dark:text-white">
+                Invalid reset link
+              </h2>
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                This password reset link is missing its token. Request a new
+                link and open it directly from your email.
+              </p>
+            </div>
+
+            <div className="mt-8 space-y-4">
+              <Button
+                onClick={() => navigate("/auth/forgot-password")}
+                className="w-full"
+              >
+                Request a new link
+              </Button>
+
+              <div className="text-center">
+                <Link
+                  to="/auth/login"
+                  className="inline-flex items-center text-sm font-medium text-primary-600 hover:text-primary-500"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-1" />
+                  Back to login
+                </Link>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   if (isSuccess) {
     return (
@@ -125,8 +157,7 @@ const ResetPassword = () => {
             Reset your password
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-            Enter your new password for{" "}
-            <span className="font-medium text-primary-600">{email}</span>
+            Choose a new password for your account.
           </p>
         </div>
 
@@ -234,7 +265,7 @@ const ResetPassword = () => {
                       One number
                     </li>
                   )}
-                  {SECURITY_CONFIG.passwordRequireNumbers && (
+                  {SECURITY_CONFIG.passwordRequireSpecialChars && (
                     <li
                       className={`flex items-center text-sm ${
                         /[!@#$%^&*(),.?":{}|<>]/.test(watchPassword)
