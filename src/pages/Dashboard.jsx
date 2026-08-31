@@ -110,7 +110,10 @@ const Dashboard = () => {
 
   // Handle potential undefined fields for graphs and analytics
   const userSignupGraph = dashboardData?.userSignupGraph || [];
-  const revenueGraph = dashboardData?.revenueGraph || [];
+  const revenueGraph = (dashboardData?.revenueGraph || []).map(item => ({
+    ...item,
+    total: (item.total || 0) / 100
+  }));
   const recentActivities = dashboardData?.recentActivities || [];
 
   // Main Stats
@@ -137,7 +140,7 @@ const Dashboard = () => {
     // },
     {
       title: "Total Revenue",
-      value: formatCurrency(dashboardData.totalRevenue),
+      value: formatCurrency((dashboardData.totalRevenue || 0) / 100),
       trend: "up",
       icon: TrendingUp,
     },
