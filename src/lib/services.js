@@ -12,9 +12,14 @@ const API = axios.create({
 API.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("authToken"); // Retrieve token from storage
-    // console.log("req token: ", token);
     if (token) {
-      config.headers.authorization = `Bearer ${token}`;
+      if (config.headers && typeof config.headers.set === "function") {
+        config.headers.set("Authorization", `Bearer ${token}`);
+      } else {
+        config.headers = config.headers || {};
+        config.headers.Authorization = `Bearer ${token}`;
+        config.headers.authorization = `Bearer ${token}`;
+      }
     }
     return config;
   },
@@ -25,11 +30,39 @@ API.interceptors.request.use(
 API.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error?.response?.status === 401 || error?.response?.status === 403) {
+    const url = String(error?.config?.url || "").toLowerCase();
+
+    // Check if the request is an authentication/authorization API
+    const isAuthApi =
+      url.includes("/signin") ||
+      url.includes("/login") ||
+      url.includes("/signup") ||
+      url.includes("/register") ||
+      url.includes("/forgot-password") ||
+      url.includes("/reset-password") ||
+      url.includes("/change-password") ||
+      url.includes("/verify-otp") ||
+      url.includes("/auth/");
+
+    // Check if user is already on an auth page to prevent reload loops
+    const isAlreadyOnAuthPage =
+      typeof window !== "undefined" &&
+      window.location &&
+      window.location.pathname.startsWith("/auth");
+
+    const status = error?.response?.status;
+
+    // Only redirect to login page for session expiration on non-auth APIs when not already on auth page
+    if (
+      (status === 401 || status === 403) &&
+      !isAuthApi &&
+      !isAlreadyOnAuthPage
+    ) {
       localStorage.removeItem("authToken"); // Remove token if unauthorized
+      localStorage.removeItem("userData");
       window.location.href = "/auth/login"; // Redirect to login page
     }
-    console.log(error);
+
     console.log("API Error:", error.response?.data || error);
     return Promise.reject(error);
   }
@@ -39,6 +72,7 @@ API.interceptors.response.use(
 const handleApiError = (error) => {
   if (axios.isAxiosError(error)) {
     const errorMessage =
+      error.response?.data?.data?.message ||
       error.response?.data?.message ||
       error.message ||
       "An unexpected error occurred";
@@ -103,7 +137,7 @@ const verifyOTP = (payload) =>
   );
 
 const updatePassword = (payload) =>
-  apiHandler(() => API.post("/auth/update-password", payload));
+  apiHandler(() => API.post("/user/change-password", payload));
 
 const updatePasswordAuth = (payload) =>
   apiHandler(() => API.post("/auth/update-password-auth", payload));

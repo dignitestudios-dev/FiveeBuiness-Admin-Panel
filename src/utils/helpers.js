@@ -149,9 +149,13 @@ export const deepClone = (obj) => {
 
 export const handleError = (error) => {
   console.log(error);
-  toast.error(
-    error?.message || error?.response?.data?.message || "Something went wrong"
-  );
+  const message =
+    (typeof error === "string" ? error : null) ||
+    error?.response?.data?.data?.message ||
+    error?.response?.data?.message ||
+    error?.message ||
+    "Something went wrong";
+  toast.error(message);
 };
 
 export const handleSuccess = (message, customMessage) => {

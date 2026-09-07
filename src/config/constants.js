@@ -164,20 +164,19 @@ export const MENU_ITEMS = [
     path: "/support/chat",
     children: [],
   },
-  // {
-  //   id: "settings",
-  //   label: "Settings",
-  //   icon: "Settings",
-  //   path: "/settings/change-password",
-  //   children: [
-  //     {
-  //       id: "change-password",
-  //       label: "Change Password",
-  //       path: "/settings/change-password",
-  //     },
-  //     { id: "general", label: "General Settings", path: "/settings/general" },
-  //   ],
-  // },
+  {
+    id: "settings",
+    label: "Settings",
+    icon: "Settings",
+    path: "/settings/change-password",
+    children: [
+      {
+        id: "change-password",
+        label: "Change Password",
+        path: "/settings/change-password",
+      },
+    ],
+  },
   // {
   //   id: "docs",
   //   label: "Documentation",

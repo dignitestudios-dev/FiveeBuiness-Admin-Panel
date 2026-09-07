@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Settings, LogOut, Moon, Sun, Menu, X } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Settings, LogOut, Moon, Sun, Menu, X, Lock } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useApp } from "../../contexts/AppContext";
@@ -85,7 +86,9 @@ const Header = () => {
                 )}
               </div>
               <div className="hidden md:block text-left">
-                <p className="text-sm font-medium">{user?.name || "User"}</p>
+                <p className="text-sm font-medium">
+                  {user?.name || [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Admin"}
+                </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   {user?.role || "Admin"}
                 </p>
@@ -97,13 +100,22 @@ const Header = () => {
               <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 scale-in">
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                   <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {user?.name}
+                    {user?.name || [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Admin"}
                   </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     {user?.email}
                   </p>
                 </div>
                 <div className="py-2">
+                  <Link
+                    to="/settings/change-password"
+                    onClick={() => setShowUserMenu(false)}
+                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                  >
+                    <Lock className="w-4 h-4 mr-3 text-gray-500 dark:text-gray-400" />
+                    Change Password
+                  </Link>
+                  <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
                   <button
                     onClick={handleLogout}
                     className="flex items-center w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"

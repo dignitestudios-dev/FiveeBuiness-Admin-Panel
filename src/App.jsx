@@ -33,6 +33,7 @@ import { Toaster } from "react-hot-toast";
 import Categories from "./pages/Categories";
 import Videos from "./pages/Videos";
 import Chat from "./pages/Chat";
+import ChangePassword from "./pages/ChangePassword";
 
 function App() {
   return (
@@ -140,6 +141,10 @@ function App() {
                               }
                             />
                             <Route
+                              path="change-password"
+                              element={<ChangePassword />}
+                            />
+                            <Route
                               path="general"
                               element={
                                 <div className="p-6">
@@ -150,6 +155,11 @@ function App() {
                               }
                             />
                           </Route>
+
+                          <Route
+                            path="/change-password"
+                            element={<ChangePassword />}
+                          />
 
                           <Route path="/docs" element={<Documentation />} />
                         </Routes>

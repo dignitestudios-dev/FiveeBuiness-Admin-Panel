@@ -90,7 +90,11 @@ export const AuthProvider = ({ children }) => {
       //   }
       // }
 
-      const userData = response?.data?.role;
+      const userData =
+        response?.data?.user ||
+        (typeof response?.data?.role === "object"
+          ? response?.data?.role
+          : { role: response?.data?.role, name: "Admin" });
       const token = response?.data?.token;
 
       // Store auth data
@@ -246,13 +250,12 @@ export const AuthProvider = ({ children }) => {
     setLoadingAuthActions(true);
     try {
       const response = await api.updatePassword(payload);
-
-      if (response.success) {
-        handleSuccess(response.message, "Password updated successfully");
-        return { success: true };
-      } else {
-        throw new Error(response.message || "Failed to update password.");
-      }
+      const message =
+        response?.data?.message ||
+        response?.message ||
+        "Password updated successfully";
+      handleSuccess(message, "Password updated successfully");
+      return { success: true, message };
     } catch (error) {
       handleError(error);
       return {

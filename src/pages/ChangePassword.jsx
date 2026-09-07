@@ -76,7 +76,6 @@ const ChangePassword = () => {
           setIsSuccess(false);
         }, 5000);
       } else {
-        handleError(response.error || "Error changing password");
         console.error("Error changing password:", response.error);
       }
     } catch (error) {
